@@ -29,12 +29,55 @@ resource "azurerm_sql_virtual_network_rule" "k8s" {
 }
 
 resource "azurerm_mssql_database" "notejam" {
-  count          = length(local.locations)
   name           = "notejam"
-  server_id      = element(azurerm_mssql_server.mssql.*, count.index).id
+  server_id      = azurerm_mssql_server.mssql[0].id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
   license_type   = "LicenseIncluded"
   max_size_gb    = var.mssql_db_max_size_gb
   sku_name       = var.mssql_db_sku
   zone_redundant = true
+}
+
+resource "azurerm_sql_failover_group" "db_failover" {
+  name                = "${var.prefix}-notejam-db"
+  resource_group_name = azurerm_resource_group.mssql_rg[0].name
+  server_name         = azurerm_mssql_server.mssql[0].name
+  databases           = [azurerm_mssql_database.notejam.id]
+
+  partner_servers {
+    id = azurerm_resource_group.mssql_rg[0].id
+  }
+
+  read_write_endpoint_failover_policy {
+    mode          = "Automatic"
+    grace_minutes = 60
+  }
+}
+
+data "azurerm_monitor_diagnostic_categories" "db" {
+  resource_id = azurerm_mssql_database.notejam.id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "db" {
+  name                       = "db1-to-log-analytics"
+  target_resource_id         = azurerm_mssql_database.notejam.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
+
+  dynamic "log" {
+    for_each = data.azurerm_monitor_diagnostic_categories.db.logs
+
+    content {
+      category = log
+      enabled  = true
+    }
+  }
+
+  dynamic "metric" {
+    for_each = data.azurerm_monitor_diagnostic_categories.db.metrics
+
+    content {
+      category = metric
+      enabled  = true
+    }
+  }
 }

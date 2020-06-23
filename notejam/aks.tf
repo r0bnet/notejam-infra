@@ -44,3 +44,28 @@ resource "azurerm_kubernetes_cluster" "aks" {
     ignore_changes = [default_node_pool.0.node_count]
   }
 }
+
+data "azurerm_monitor_diagnostic_categories" "aks" {
+  count       = length(local.locations)
+  resource_id = element(azurerm_kubernetes_cluster.aks, count.index).id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "aks" {
+  count                      = length(local.locations)
+  name                       = "aks${count.index + 1}-to-log-analytics"
+  target_resource_id         = element(azurerm_kubernetes_cluster.aks, count.index).id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
+
+  dynamic "log" {
+    for_each = element(data.azurerm_monitor_diagnostic_categories.aks, count.index).logs
+
+    content {
+      category = log
+      enabled  = true
+    }
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}

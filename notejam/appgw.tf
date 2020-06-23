@@ -94,3 +94,28 @@ resource "azurerm_application_gateway" "appgw" {
     backend_http_settings_name = "notejam-backend-http-settings"
   }
 }
+
+data "azurerm_monitor_diagnostic_categories" "appgw" {
+  count       = length(local.locations)
+  resource_id = element(azurerm_application_gateway.appgw, count.index).id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "appgw" {
+  count                      = length(local.locations)
+  name                       = "appgw${count.index + 1}-to-log-analytics"
+  target_resource_id         = element(azurerm_application_gateway.appgw, count.index).id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
+
+  dynamic "log" {
+    for_each = element(data.azurerm_monitor_diagnostic_categories.appgw, count.index).logs
+
+    content {
+      category = log
+      enabled  = true
+    }
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}

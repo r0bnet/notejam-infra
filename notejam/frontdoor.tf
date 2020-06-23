@@ -57,3 +57,26 @@ resource "azurerm_frontdoor" "frontdoor" {
     }
   }
 }
+
+data "azurerm_monitor_diagnostic_categories" "frontdoor" {
+  resource_id = azurerm_frontdoor.frontdoor.id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "frontdoor" {
+  name                       = "frontdoor-to-log-analytics"
+  target_resource_id         = azurerm_frontdoor.frontdoor.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
+
+  dynamic "log" {
+    for_each = data.azurerm_monitor_diagnostic_categories.frontdoor.logs
+
+    content {
+      category = log
+      enabled  = true
+    }
+  }
+
+  metric {
+    category = "AllMetrics"
+  }
+}
