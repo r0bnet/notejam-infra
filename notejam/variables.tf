@@ -16,5 +16,6 @@ variable "mssql_db_sku" {
 }
 
 variable "mssql_db_max_size_gb" {
-  type = number
+  type    = number
+  default = 4
 }

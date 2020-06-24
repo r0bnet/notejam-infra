@@ -28,6 +28,10 @@ resource "azurerm_sql_virtual_network_rule" "k8s" {
   subnet_id           = element(azurerm_subnet.k8s.*, count.index).id
 }
 
+// it's currently not possible to change backup retention long- or short term in terraform
+// we have to do that manually after deployment with post-deployment.sh script
+// (setting retention only works with PowerShell currently)
+
 resource "azurerm_mssql_database" "notejam" {
   name           = "notejam"
   server_id      = azurerm_mssql_server.mssql[0].id
